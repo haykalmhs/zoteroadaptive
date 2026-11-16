@@ -68,23 +68,7 @@ import org.zotero.android.data.model.ZoteroNote
 import org.zotero.android.ui.NotesFilter
 import org.zotero.android.ui.ZoteroUiState
 import org.zotero.android.ui.components.SpeedDialFabMenu
-import org.zotero.android.ui.theme.KeepNoteLavender
-import org.zotero.android.ui.theme.KeepNoteMint
-import org.zotero.android.ui.theme.KeepNoteRose
-import org.zotero.android.ui.theme.KeepNoteSand
-import org.zotero.android.ui.theme.KeepNoteSky
-import org.zotero.android.ui.theme.KeepNoteSlate
-import org.zotero.android.ui.theme.OnTealAccentPill
-import org.zotero.android.ui.theme.TealAccentPill
-
-private val keepPastelPalette = listOf(
-    KeepNoteSand,
-    KeepNoteMint,
-    KeepNoteSky,
-    KeepNoteLavender,
-    KeepNoteRose,
-    KeepNoteSlate
-)
+import org.zotero.android.ui.theme.ZoteroThemeTokens
 
 @Composable
 fun NotesScreen(
@@ -100,6 +84,7 @@ fun NotesScreen(
     onShowIdentifierDialog: () -> Unit,
     onShowCreateItemDialog: () -> Unit
 ) {
+    val extColors = ZoteroThemeTokens.colors
     var showCreateNoteDialog by rememberSaveable { mutableStateOf(false) }
     var editingNote by remember { mutableStateOf<ZoteroNote?>(null) }
     var fabExpanded by rememberSaveable { mutableStateOf(false) }
@@ -202,8 +187,8 @@ fun NotesScreen(
                         onClick = { onSetNotesFilter(filter) },
                         label = { Text(filter.label) },
                         colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = TealAccentPill,
-                            selectedLabelColor = OnTealAccentPill
+                            selectedContainerColor = extColors.accentPill,
+                            selectedLabelColor = extColors.onAccentPill
                         ),
                         modifier = Modifier.testTag("notes_filter_${filter.name}")
                     )
@@ -415,12 +400,9 @@ private fun KeepBentoNoteCard(
     onCopyNote: () -> Unit,
     onDeleteNote: () -> Unit
 ) {
-    val isDark = isSystemInDarkTheme()
-    val cardBgColor = if (isDark) {
-        MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)
-    } else {
-        keepPastelPalette[colorIndex % keepPastelPalette.size]
-    }
+    val extColors = ZoteroThemeTokens.colors
+    val palette = extColors.bentoNotePalette
+    val cardBgColor = palette[colorIndex % palette.size]
 
     Card(
         modifier = Modifier

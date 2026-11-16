@@ -42,8 +42,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import org.zotero.android.ui.theme.OnTealAccentPill
-import org.zotero.android.ui.theme.TealAccentPill
+import org.zotero.android.ui.theme.ZoteroThemeTokens
 
 @Composable
 fun SpeedDialFabMenu(
@@ -55,6 +54,7 @@ fun SpeedDialFabMenu(
     onQuickNote: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val extColors = ZoteroThemeTokens.colors
     val rotation by animateFloatAsState(
         targetValue = if (expanded) 45f else 0f,
         label = "fab_rotation"
@@ -70,7 +70,7 @@ fun SpeedDialFabMenu(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.28f))
+                    .background(Color.Black.copy(alpha = if (extColors.isDark) 0.5f else 0.28f))
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -130,8 +130,8 @@ fun SpeedDialFabMenu(
             FloatingActionButton(
                 onClick = onToggleExpanded,
                 shape = RoundedCornerShape(18.dp),
-                containerColor = TealAccentPill,
-                contentColor = OnTealAccentPill,
+                containerColor = extColors.accentPill,
+                contentColor = extColors.onAccentPill,
                 elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 4.dp),
                 modifier = Modifier
                     .size(58.dp)
@@ -156,6 +156,7 @@ private fun SpeedDialMenuItem(
     testTag: String,
     onClick: () -> Unit
 ) {
+    val extColors = ZoteroThemeTokens.colors
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.End,
@@ -183,8 +184,8 @@ private fun SpeedDialMenuItem(
         SmallFloatingActionButton(
             onClick = onClick,
             shape = RoundedCornerShape(14.dp),
-            containerColor = TealAccentPill,
-            contentColor = OnTealAccentPill,
+            containerColor = extColors.accentPill,
+            contentColor = extColors.onAccentPill,
             elevation = FloatingActionButtonDefaults.elevation(defaultElevation = 3.dp),
             modifier = Modifier.size(44.dp)
         ) {

@@ -20,7 +20,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -34,14 +34,17 @@ import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.FolderOpen
 import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.School
+import androidx.compose.material.icons.filled.Science
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.ViewAgenda
 import androidx.compose.material.icons.filled.ViewCompact
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -58,6 +61,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -70,19 +74,33 @@ import org.zotero.android.data.model.ZoteroItem
 import org.zotero.android.ui.LibraryFilter
 import org.zotero.android.ui.ZoteroUiState
 import org.zotero.android.ui.components.SpeedDialFabMenu
-import org.zotero.android.ui.theme.CoralPdfBg
-import org.zotero.android.ui.theme.CoralPdfText
-import org.zotero.android.ui.theme.IconTileBg
-import org.zotero.android.ui.theme.IconTileTint
-import org.zotero.android.ui.theme.OpenAccessBg
-import org.zotero.android.ui.theme.OpenAccessText
-import org.zotero.android.ui.theme.VenueChipBg
-import org.zotero.android.ui.theme.VenueChipText
+import org.zotero.android.ui.theme.ZoteroThemeTokens
 
 fun itemTypeLeadingIcon(itemType: ItemType): ImageVector = when (itemType) {
-    ItemType.BOOK, ItemType.THESIS -> Icons.AutoMirrored.Filled.MenuBook
-    ItemType.PREPRINT, ItemType.REPORT -> Icons.Default.Description
-    else -> Icons.AutoMirrored.Filled.Article
+    ItemType.JOURNAL_ARTICLE -> Icons.AutoMirrored.Filled.Article
+    ItemType.BOOK -> Icons.AutoMirrored.Filled.MenuBook
+    ItemType.CONFERENCE_PAPER -> Icons.Default.Groups
+    ItemType.PREPRINT -> Icons.Default.Science
+    ItemType.THESIS -> Icons.Default.School
+    ItemType.REPORT -> Icons.Default.Description
+    ItemType.WEBPAGE -> Icons.Default.Language
+}
+
+fun groupedListItemShape(index: Int, totalCount: Int): Shape = when {
+    totalCount <= 1 -> RoundedCornerShape(16.dp)
+    index == 0 -> RoundedCornerShape(
+        topStart = 16.dp,
+        topEnd = 16.dp,
+        bottomStart = 6.dp,
+        bottomEnd = 6.dp
+    )
+    index == totalCount - 1 -> RoundedCornerShape(
+        topStart = 6.dp,
+        topEnd = 6.dp,
+        bottomStart = 16.dp,
+        bottomEnd = 16.dp
+    )
+    else -> RoundedCornerShape(6.dp)
 }
 
 @Composable
@@ -102,10 +120,15 @@ fun LibraryScreen(
     onShowCreateItemDialog: () -> Unit,
     onShowQuickNoteDialog: () -> Unit
 ) {
+    val extColors = ZoteroThemeTokens.colors
     var showSortMenu by remember { mutableStateOf(false) }
     var fabExpanded by rememberSaveable { mutableStateOf(false) }
 
-    Box(modifier = Modifier.fillMaxSize()) {
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(extColors.listCanvasBg)
+    ) {
         Column(modifier = Modifier.fillMaxSize()) {
             // 1. Gmail-Style Floating Search Bar (tapping opens Full-Screen Search Overlay; right icon switches view density)
             Surface(
@@ -181,7 +204,7 @@ fun LibraryScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 18.dp, vertical = 5.dp),
+                    .padding(horizontal = 18.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
@@ -238,14 +261,14 @@ fun LibraryScreen(
                     if (uiState.activeTagFilter != null) {
                         Spacer(modifier = Modifier.width(8.dp))
                         Surface(
-                            color = OpenAccessBg,
+                            color = extColors.openAccessBg,
                             shape = RoundedCornerShape(6.dp),
                             modifier = Modifier.clickable { onClearTagFilter() }
                         ) {
                             Text(
                                 text = "#${uiState.activeTagFilter} ×",
                                 style = MaterialTheme.typography.labelMedium,
-                                color = OpenAccessText,
+                                color = extColors.openAccessText,
                                 modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp)
                             )
                         }
@@ -319,9 +342,7 @@ fun LibraryScreen(
                 }
             }
 
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f))
-
-            // 3. Divider-Separated Gmail-Style Paper List
+            // 3. Grouped Material 3 Surface List (No HorizontalDividers)
             if (uiState.filteredItems.isEmpty()) {
                 Box(
                     modifier = Modifier
@@ -360,23 +381,27 @@ fun LibraryScreen(
                     }
                 }
             } else {
+                val totalCount = uiState.filteredItems.size
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
                         .testTag("library_item_list"),
-                    contentPadding = PaddingValues(bottom = 96.dp)
+                    contentPadding = PaddingValues(
+                        start = 12.dp,
+                        end = 12.dp,
+                        top = 6.dp,
+                        bottom = 96.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(if (uiState.isLibraryCompactView) 4.dp else 6.dp)
                 ) {
-                    items(uiState.filteredItems, key = { it.id }) { item ->
+                    itemsIndexed(uiState.filteredItems, key = { _, it -> it.id }) { index, item ->
                         GmailStylePaperRow(
                             item = item,
                             isCompact = uiState.isLibraryCompactView,
+                            shape = groupedListItemShape(index, totalCount),
                             onOpenPaperReader = { onOpenPaperReader(item.id) },
                             onOpenMetadataSheet = { onOpenMetadataSheet(item.id) },
                             onToggleFavorite = { onToggleFavorite(item) }
-                        )
-                        HorizontalDivider(
-                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
-                            thickness = 0.8.dp
                         )
                     }
                 }
@@ -400,42 +425,54 @@ fun LibraryScreen(
 fun GmailStylePaperRow(
     item: ZoteroItem,
     isCompact: Boolean = false,
+    shape: Shape = RoundedCornerShape(14.dp),
     onOpenPaperReader: () -> Unit,
     onOpenMetadataSheet: () -> Unit,
     onToggleFavorite: () -> Unit
 ) {
-    Row(
+    val extColors = ZoteroThemeTokens.colors
+    val iconStyle = extColors.itemTypeIconColors(item.itemType)
+
+    Surface(
         modifier = Modifier
             .fillMaxWidth()
+            .clip(shape)
             .combinedClickable(
                 onClick = onOpenPaperReader,
                 onLongClick = onOpenMetadataSheet
             )
-            .padding(
-                horizontal = 16.dp,
-                vertical = if (isCompact) 10.dp else 14.dp
-            )
             .testTag("item_row_${item.itemKey}"),
-        verticalAlignment = Alignment.Top
+        shape = shape,
+        color = extColors.listCardSurface,
+        tonalElevation = 1.dp
     ) {
-        // Left rounded-square icon tile
-        Box(
+        Row(
             modifier = Modifier
-                .padding(top = 2.dp)
-                .size(if (isCompact) 34.dp else 40.dp)
-                .clip(RoundedCornerShape(10.dp))
-                .background(IconTileBg)
-                .clickable(onClick = onOpenMetadataSheet)
-                .testTag("item_icon_info_${item.itemKey}"),
-            contentAlignment = Alignment.Center
+                .fillMaxWidth()
+                .padding(
+                    horizontal = 14.dp,
+                    vertical = if (isCompact) 10.dp else 14.dp
+                ),
+            verticalAlignment = Alignment.Top
         ) {
-            Icon(
-                imageVector = itemTypeLeadingIcon(item.itemType),
-                contentDescription = "Paper Metadata",
-                tint = IconTileTint,
-                modifier = Modifier.size(if (isCompact) 18.dp else 20.dp)
-            )
-        }
+            // Left rounded-square icon tile (colored by ItemType shade; list card itself stays neutral)
+            Box(
+                modifier = Modifier
+                    .padding(top = 2.dp)
+                    .size(if (isCompact) 36.dp else 40.dp)
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(iconStyle.containerColor)
+                    .clickable(onClick = onOpenMetadataSheet)
+                    .testTag("item_icon_info_${item.itemKey}"),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = itemTypeLeadingIcon(item.itemType),
+                    contentDescription = "${item.itemType.label} Metadata",
+                    tint = iconStyle.iconTint,
+                    modifier = Modifier.size(if (isCompact) 18.dp else 20.dp)
+                )
+            }
 
         Spacer(modifier = Modifier.width(14.dp))
 
@@ -516,7 +553,7 @@ fun GmailStylePaperRow(
                 ) {
                     if (item.hasPdfAttachment) {
                         Surface(
-                            color = CoralPdfBg,
+                            color = extColors.pdfBadgeBg,
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
@@ -525,7 +562,7 @@ fun GmailStylePaperRow(
                                     fontWeight = FontWeight.Bold,
                                     letterSpacing = 0.3.sp
                                 ),
-                                color = CoralPdfText,
+                                color = extColors.pdfBadgeText,
                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
                             )
                         }
@@ -533,13 +570,13 @@ fun GmailStylePaperRow(
 
                     if (item.displayVenueBadge.isNotBlank()) {
                         Surface(
-                            color = VenueChipBg,
+                            color = extColors.venueChipBg,
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
                                 text = item.displayVenueBadge,
                                 style = MaterialTheme.typography.labelSmall.copy(fontSize = 11.sp),
-                                color = VenueChipText,
+                                color = extColors.venueChipText,
                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
                             )
                         }
@@ -548,13 +585,13 @@ fun GmailStylePaperRow(
                     // Show "Open Access" pill if tagged
                     item.tags.firstOrNull { it.name.equals("Open Access", ignoreCase = true) }?.let { oaTag ->
                         Surface(
-                            color = OpenAccessBg,
+                            color = extColors.openAccessBg,
                             shape = RoundedCornerShape(6.dp)
                         ) {
                             Text(
                                 text = oaTag.name,
                                 style = MaterialTheme.typography.labelMedium,
-                                color = OpenAccessText,
+                                color = extColors.openAccessText,
                                 modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.5.dp)
                             )
                         }
@@ -620,6 +657,7 @@ fun GmailStylePaperRow(
                     }
                 }
             }
+        }
         }
     }
 }

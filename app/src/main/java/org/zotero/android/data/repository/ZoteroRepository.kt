@@ -46,61 +46,71 @@ class ZoteroRepository(private val dao: ZoteroDao) {
                 key = "COL_FYP",
                 name = "Final Year Project",
                 parentKey = null,
-                description = "Thesis literature, foundation models, and volcano-seismic signal processing"
+                description = "Thesis literature, foundation models, and volcano-seismic signal processing",
+                sortOrder = 0
             ),
             ZoteroCollection(
                 key = "COL_SIGPROC",
                 name = "Signal Processing",
                 parentKey = "COL_FYP",
-                description = "Spectral analysis, wavelets, and neural feature extraction"
+                description = "Spectral analysis, wavelets, and neural feature extraction",
+                sortOrder = 0
             ),
             ZoteroCollection(
                 key = "COL_CLASSIFICATION",
                 name = "Classification",
                 parentKey = "COL_SIGPROC",
-                description = "Deep transfer learning and event classification models"
+                description = "Deep transfer learning and event classification models",
+                sortOrder = 0
             ),
             ZoteroCollection(
                 key = "COL_DETECTION",
                 name = "Detection",
                 parentKey = "COL_SIGPROC",
-                description = "Onset picking and STA/LTA trigger algorithms"
+                description = "Onset picking and STA/LTA trigger algorithms",
+                sortOrder = 1
             ),
             ZoteroCollection(
                 key = "COL_EARLY_WARNING",
                 name = "Early Warning",
                 parentKey = "COL_SIGPROC",
-                description = "Real-time eruption precursors and alert thresholds"
+                description = "Real-time eruption precursors and alert thresholds",
+                sortOrder = 2
             ),
             ZoteroCollection(
                 key = "COL_FEATURE_EXTRACTION",
                 name = "Feature Extraction",
                 parentKey = "COL_SIGPROC",
-                description = "Log-mel spectrograms, MFCCs, and self-supervised representations"
+                description = "Log-mel spectrograms, MFCCs, and self-supervised representations",
+                sortOrder = 3
             ),
             ZoteroCollection(
                 key = "COL_FORECASTING",
                 name = "Forecasting",
                 parentKey = "COL_SIGPROC",
-                description = "Probabilistic eruption forecasting models"
+                description = "Probabilistic eruption forecasting models",
+                sortOrder = 4
             ),
             ZoteroCollection(
                 key = "COL_PREPROCESSING",
                 name = "Pre-Processing",
                 parentKey = "COL_SIGPROC",
-                description = "Bandpass filtering, denoising, and instrument response removal"
+                description = "Bandpass filtering, denoising, and instrument response removal",
+                sortOrder = 5
             ),
             ZoteroCollection(
                 key = "COL_VOLCANO_MON",
                 name = "Volcano Monitoring",
                 parentKey = null,
-                description = "Multi-parameter geophysical observatory networks"
+                description = "Multi-parameter geophysical observatory networks",
+                sortOrder = 1
             ),
             ZoteroCollection(
                 key = "COL_VOLC_GEOPHYS",
                 name = "Volcanology & Geophysics",
                 parentKey = null,
-                description = "Seismo-acoustic observations and eruption plume dynamics"
+                description = "Seismo-acoustic observations and eruption plume dynamics",
+                sortOrder = 2
             ),
             // Group Libraries
             ZoteroCollection(
@@ -108,14 +118,16 @@ class ZoteroRepository(private val dao: ZoteroDao) {
                 name = "Lab ML Reading Group",
                 parentKey = "GROUP_LIBRARY",
                 isSystem = true,
-                description = "Weekly shared reading list for foundation models and PEFT"
+                description = "Weekly shared reading list for foundation models and PEFT",
+                sortOrder = 0
             ),
             ZoteroCollection(
                 key = "GRP_SEISMO",
                 name = "Seismo-Acoustic Consortium",
                 parentKey = "GROUP_LIBRARY",
                 isSystem = true,
-                description = "Shared multi-institution volcano seismology benchmark papers"
+                description = "Shared multi-institution volcano seismology benchmark papers",
+                sortOrder = 1
             )
         )
         dao.insertCollections(initialCollections.map { it.toEntity() })
@@ -544,7 +556,13 @@ class ZoteroRepository(private val dao: ZoteroDao) {
         dao.emptyTrash()
     }
 
-    suspend fun createCollection(name: String, description: String, parentKey: String? = null) {
+    suspend fun createCollection(
+        name: String,
+        description: String = "",
+        parentKey: String? = null,
+        colorHex: String? = null,
+        sortOrder: Int = 0
+    ) {
         val key = "COL_" + UUID.randomUUID().toString().take(6).uppercase()
         dao.insertCollection(
             ZoteroCollection(
@@ -552,13 +570,47 @@ class ZoteroRepository(private val dao: ZoteroDao) {
                 name = name.trim(),
                 parentKey = parentKey,
                 isSystem = false,
-                description = description.trim()
+                description = description.trim(),
+                colorHex = colorHex,
+                sortOrder = sortOrder
             ).toEntity()
         )
     }
 
+    suspend fun updateCollection(collection: ZoteroCollection) {
+        dao.insertCollection(collection.toEntity())
+    }
+
+    suspend fun updateCollections(collections: List<ZoteroCollection>) {
+        dao.insertCollections(collections.map { it.toEntity() })
+    }
+
     suspend fun deleteCollection(key: String) {
         dao.deleteCollectionByKey(key)
+    }
+
+    suspend fun deleteCollectionsAndTrashPapers(
+        keysToDelete: Set<String>,
+        currentItems: List<ZoteroItem>
+    ): Int {
+        if (keysToDelete.isEmpty()) return 0
+        var trashedPapersCount = 0
+        for (item in currentItems) {
+            if (item.collectionKeys.any { it in keysToDelete }) {
+                val remainingCols = item.collectionKeys.filterNot { it in keysToDelete }
+                if (!item.isInTrash) {
+                    trashedPapersCount++
+                }
+                dao.updateItem(
+                    item.copy(
+                        isInTrash = true,
+                        collectionKeys = remainingCols
+                    ).toEntity()
+                )
+            }
+        }
+        dao.deleteCollectionsByKeys(keysToDelete.toList())
+        return trashedPapersCount
     }
 
     suspend fun saveStandaloneNote(id: String?, title: String, content: String) {

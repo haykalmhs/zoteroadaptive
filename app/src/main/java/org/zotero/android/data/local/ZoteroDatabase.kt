@@ -125,14 +125,18 @@ data class ZoteroCollectionEntity(
     val name: String,
     val parentKey: String?,
     val isSystem: Boolean,
-    val description: String
+    val description: String,
+    val colorHex: String? = null,
+    val sortOrder: Int = 0
 ) {
     fun toDomain(): ZoteroCollection = ZoteroCollection(
         key = key,
         name = name,
         parentKey = parentKey,
         isSystem = isSystem,
-        description = description
+        description = description,
+        colorHex = colorHex,
+        sortOrder = sortOrder
     )
 }
 
@@ -141,7 +145,9 @@ fun ZoteroCollection.toEntity(): ZoteroCollectionEntity = ZoteroCollectionEntity
     name = name,
     parentKey = parentKey,
     isSystem = isSystem,
-    description = description
+    description = description,
+    colorHex = colorHex,
+    sortOrder = sortOrder
 )
 
 @Entity(tableName = "zotero_standalone_notes")
@@ -184,7 +190,7 @@ interface ZoteroDao {
     @Query("DELETE FROM zotero_items WHERE isInTrash = 1")
     suspend fun emptyTrash()
 
-    @Query("SELECT * FROM zotero_collections ORDER BY isSystem DESC, name ASC")
+    @Query("SELECT * FROM zotero_collections ORDER BY isSystem DESC, sortOrder ASC, name ASC")
     fun observeAllCollections(): Flow<List<ZoteroCollectionEntity>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
@@ -195,6 +201,9 @@ interface ZoteroDao {
 
     @Query("DELETE FROM zotero_collections WHERE key = :key AND isSystem = 0")
     suspend fun deleteCollectionByKey(key: String)
+
+    @Query("DELETE FROM zotero_collections WHERE key IN (:keys) AND isSystem = 0")
+    suspend fun deleteCollectionsByKeys(keys: List<String>)
 
     @Query("SELECT * FROM zotero_standalone_notes ORDER BY updatedAt DESC")
     fun observeStandaloneNotes(): Flow<List<ZoteroStandaloneNoteEntity>>
@@ -215,7 +224,7 @@ interface ZoteroDao {
         ZoteroCollectionEntity::class,
         ZoteroStandaloneNoteEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class ZoteroDatabase : RoomDatabase() {
@@ -230,7 +239,7 @@ abstract class ZoteroDatabase : RoomDatabase() {
                 val instance = Room.databaseBuilder(
                     context.applicationContext,
                     ZoteroDatabase::class.java,
-                    "zotero_library_v3.db"
+                    "zotero_library_v4.db"
                 ).fallbackToDestructiveMigration(true).build()
                 INSTANCE = instance
                 instance

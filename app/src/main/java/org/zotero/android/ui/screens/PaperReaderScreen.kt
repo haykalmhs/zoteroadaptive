@@ -71,12 +71,7 @@ import androidx.compose.ui.unit.sp
 import org.zotero.android.data.model.PdfAnnotation
 import org.zotero.android.data.model.ZoteroItem
 import org.zotero.android.ui.components.parseHexColor
-import org.zotero.android.ui.theme.CoralPdfBg
-import org.zotero.android.ui.theme.CoralPdfText
-import org.zotero.android.ui.theme.OnTealAccentPill
-import org.zotero.android.ui.theme.TealAccentPill
-import org.zotero.android.ui.theme.VenueChipBg
-import org.zotero.android.ui.theme.VenueChipText
+import org.zotero.android.ui.theme.ZoteroThemeTokens
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -90,6 +85,7 @@ fun PaperReaderScreen(
     onDeleteAnnotation: (annotationId: String) -> Unit,
     onAddNote: (title: String, content: String) -> Unit
 ) {
+    val extColors = ZoteroThemeTokens.colors
     BackHandler(onBack = onBack)
 
     var showHighlightDialog by rememberSaveable { mutableStateOf(false) }
@@ -192,8 +188,8 @@ fun PaperReaderScreen(
                     prefillHighlightPage = "p. 1"
                     showHighlightDialog = true
                 },
-                containerColor = TealAccentPill,
-                contentColor = OnTealAccentPill,
+                containerColor = extColors.accentPill,
+                contentColor = extColors.onAccentPill,
                 icon = {
                     Icon(Icons.Default.BorderColor, contentDescription = null)
                 },
@@ -218,21 +214,21 @@ fun PaperReaderScreen(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         if (item.hasPdfAttachment) {
-                            Surface(color = CoralPdfBg, shape = RoundedCornerShape(6.dp)) {
+                            Surface(color = extColors.pdfBadgeBg, shape = RoundedCornerShape(6.dp)) {
                                 Text(
                                     text = "PDF READING MODE",
                                     style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.Bold),
-                                    color = CoralPdfText,
+                                    color = extColors.pdfBadgeText,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                 )
                             }
                         }
                         if (item.displayVenueBadge.isNotBlank()) {
-                            Surface(color = VenueChipBg, shape = RoundedCornerShape(6.dp)) {
+                            Surface(color = extColors.venueChipBg, shape = RoundedCornerShape(6.dp)) {
                                 Text(
                                     text = item.displayVenueBadge,
                                     style = MaterialTheme.typography.labelSmall,
-                                    color = VenueChipText,
+                                    color = extColors.venueChipText,
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
                                 )
                             }

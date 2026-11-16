@@ -21,6 +21,7 @@ import org.zotero.android.data.model.ZoteroItem
 import org.zotero.android.data.model.ZoteroNote
 import org.zotero.android.data.model.ZoteroTag
 import org.zotero.android.data.repository.ZoteroRepository
+import org.zotero.android.ui.theme.ThemeMode
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -38,6 +39,13 @@ enum class NotesFilter(val label: String) {
     ALL("All Notes"),
     PAPER_NOTES("Paper Notes"),
     STANDALONE("Standalone")
+}
+
+enum class FolderDropPlacement {
+    ABOVE,
+    BELOW,
+    INSIDE,
+    ROOT_TOP
 }
 
 data class SearchFilters(
@@ -80,6 +88,7 @@ data class ZoteroUiState(
     val isLibraryCompactView: Boolean = false,
     val sortField: SortField = SortField.DATE_ADDED,
     val isSearchScreenOpen: Boolean = false,
+    val isManageFoldersOpen: Boolean = false,
     val searchFilters: SearchFilters = SearchFilters(),
     val searchMatchedItems: List<ZoteroItem> = emptyList(),
     val searchMatchedNotes: List<ZoteroNote> = emptyList(),
@@ -93,6 +102,7 @@ data class ZoteroUiState(
     val metadataSheetItemId: Int? = null,
     val citationSheetItemId: Int? = null,
     val citationStyle: CitationStyle = CitationStyle.APA_7,
+    val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val isLookingUpIdentifier: Boolean = false,
     val statusBannerMessage: String? = null
 ) {
@@ -124,10 +134,12 @@ private data class ModalAndViewParams(
     val isNotesBentoGrid: Boolean,
     val isLibraryCompactView: Boolean,
     val isSearchScreenOpen: Boolean,
+    val isManageFoldersOpen: Boolean,
     val searchFilters: SearchFilters,
     val recentSearches: List<String>,
     val isLookingUpIdentifier: Boolean,
-    val statusBannerMessage: String?
+    val statusBannerMessage: String?,
+    val themeMode: ThemeMode
 )
 
 class ZoteroViewModel(application: Application) : AndroidViewModel(application) {
@@ -145,6 +157,7 @@ class ZoteroViewModel(application: Application) : AndroidViewModel(application) 
     private val _isLibraryCompactView = MutableStateFlow(false)
     private val _sortField = MutableStateFlow(SortField.DATE_ADDED)
     private val _isSearchScreenOpen = MutableStateFlow(false)
+    private val _isManageFoldersOpen = MutableStateFlow(false)
     private val _searchFilters = MutableStateFlow(SearchFilters())
     private val _recentSearches = MutableStateFlow(
         listOf(
@@ -153,6 +166,12 @@ class ZoteroViewModel(application: Application) : AndroidViewModel(application) 
             "Constitutional AI",
             "seismo-acoustic plume height"
         )
+    )
+    private val prefs = application.getSharedPreferences("zotero_ui_prefs", Application.MODE_PRIVATE)
+    private val _themeMode = MutableStateFlow(
+        prefs.getString("theme_mode", ThemeMode.SYSTEM.name)?.let { saved ->
+            ThemeMode.entries.firstOrNull { it.name == saved }
+        } ?: ThemeMode.SYSTEM
     )
     private val _readingItemId = MutableStateFlow<Int?>(null)
     private val _metadataSheetItemId = MutableStateFlow<Int?>(null)
@@ -178,11 +197,11 @@ class ZoteroViewModel(application: Application) : AndroidViewModel(application) 
     }
 
     private val modalParamsFlow = combine(
-        combine(_readingItemId, _metadataSheetItemId, _citationSheetItemId, _citationStyle) { rId, mId, cId, style ->
-            listOf(rId, mId, cId, style)
+        combine(_readingItemId, _metadataSheetItemId, _citationSheetItemId, _citationStyle, _themeMode) { rId, mId, cId, style, theme ->
+            listOf(rId, mId, cId, style, theme)
         },
-        combine(_notesSearchQuery, _notesFilter, _isNotesBentoGrid, _isLibraryCompactView) { nQuery, nFilter, bento, compact ->
-            listOf(nQuery, nFilter, bento, compact)
+        combine(_notesSearchQuery, _notesFilter, _isNotesBentoGrid, _isLibraryCompactView, _isManageFoldersOpen) { nQuery, nFilter, bento, compact, mFolders ->
+            listOf(nQuery, nFilter, bento, compact, mFolders)
         },
         combine(_isSearchScreenOpen, _searchFilters, _recentSearches, _isLookingUpIdentifier, _statusBannerMessage) { sOpen, sFilters, recent, loading, msg ->
             listOf(sOpen, sFilters, recent, loading, msg)
@@ -198,11 +217,13 @@ class ZoteroViewModel(application: Application) : AndroidViewModel(application) 
             notesFilter = part2[1] as NotesFilter,
             isNotesBentoGrid = part2[2] as Boolean,
             isLibraryCompactView = part2[3] as Boolean,
+            isManageFoldersOpen = part2[4] as Boolean,
             isSearchScreenOpen = part3[0] as Boolean,
             searchFilters = part3[1] as SearchFilters,
             recentSearches = part3[2] as List<String>,
             isLookingUpIdentifier = part3[3] as Boolean,
-            statusBannerMessage = part3[4] as String?
+            statusBannerMessage = part3[4] as String?,
+            themeMode = part1[4] as ThemeMode
         )
     }
 
@@ -348,6 +369,7 @@ class ZoteroViewModel(application: Application) : AndroidViewModel(application) 
             isLibraryCompactView = modal.isLibraryCompactView,
             sortField = filter.sort,
             isSearchScreenOpen = modal.isSearchScreenOpen,
+            isManageFoldersOpen = modal.isManageFoldersOpen,
             searchFilters = sf,
             searchMatchedItems = searchItems,
             searchMatchedNotes = searchNotes,
@@ -356,6 +378,7 @@ class ZoteroViewModel(application: Application) : AndroidViewModel(application) 
             metadataSheetItemId = modal.metadataSheetItemId,
             citationSheetItemId = modal.citationSheetItemId,
             citationStyle = modal.citationStyle,
+            themeMode = modal.themeMode,
             isLookingUpIdentifier = modal.isLookingUpIdentifier,
             statusBannerMessage = modal.statusBannerMessage
         )
@@ -458,6 +481,16 @@ class ZoteroViewModel(application: Application) : AndroidViewModel(application) 
 
     fun toggleLibraryViewMode() {
         _isLibraryCompactView.value = !_isLibraryCompactView.value
+    }
+
+    fun setThemeMode(mode: ThemeMode) {
+        _themeMode.value = mode
+        prefs.edit().putString("theme_mode", mode.name).apply()
+    }
+
+    fun cycleThemeMode() {
+        val nextMode = _themeMode.value.next()
+        setThemeMode(nextMode)
     }
 
     fun setSearchQuery(query: String) {
@@ -760,21 +793,254 @@ class ZoteroViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    fun createCollection(name: String, description: String, parentKey: String? = null) {
+    fun openManageFolders() {
+        _isManageFoldersOpen.value = true
+    }
+
+    fun closeManageFolders() {
+        _isManageFoldersOpen.value = false
+    }
+
+    fun createCollection(
+        name: String,
+        description: String = "",
+        parentKey: String? = null,
+        colorHex: String? = null
+    ) {
         if (name.isBlank()) return
         viewModelScope.launch {
-            repository.createCollection(name, description, parentKey)
-            _statusBannerMessage.value = "Created collection \"${name.trim()}\""
+            val siblings = uiState.value.collections.filter {
+                !it.isSystem && it.parentKey == parentKey
+            }
+            val nextSortOrder = (siblings.maxOfOrNull { it.sortOrder } ?: -1) + 1
+            repository.createCollection(
+                name = name,
+                description = description,
+                parentKey = parentKey,
+                colorHex = colorHex,
+                sortOrder = nextSortOrder
+            )
+            _statusBannerMessage.value = "Created folder \"${name.trim()}\""
+        }
+    }
+
+    fun renameCollection(key: String, newName: String) {
+        val cleaned = newName.trim()
+        if (cleaned.isBlank()) return
+        val existing = uiState.value.collections.firstOrNull { it.key == key && !it.isSystem } ?: return
+        viewModelScope.launch {
+            repository.updateCollection(existing.copy(name = cleaned))
+            _statusBannerMessage.value = "Renamed folder to \"$cleaned\""
+        }
+    }
+
+    fun updateCollectionsColor(keys: Set<String>, colorHex: String?) {
+        if (keys.isEmpty()) return
+        val targets = uiState.value.collections.filter { it.key in keys && !it.isSystem }
+        if (targets.isEmpty()) return
+        viewModelScope.launch {
+            repository.updateCollections(targets.map { it.copy(colorHex = colorHex) })
+            _statusBannerMessage.value = if (targets.size == 1) {
+                "Updated color for \"${targets.first().name}\""
+            } else {
+                "Updated color for ${targets.size} folders"
+            }
+        }
+    }
+
+    fun moveCollections(keys: Set<String>, targetParentKey: String?) {
+        if (keys.isEmpty()) return
+        val allCols = uiState.value.collections
+        // Compute all descendants of the selected keys so we never move a folder into itself or its own descendant
+        val forbiddenTargets = keys.flatMap { collectDescendantKeys(it, allCols) }.toSet()
+        if (targetParentKey != null && targetParentKey in forbiddenTargets) {
+            _statusBannerMessage.value = "Cannot move a folder into itself or its subfolder"
+            return
+        }
+
+        val movingCols = allCols.filter { it.key in keys && !it.isSystem && it.parentKey != "GROUP_LIBRARY" }
+        if (movingCols.isEmpty()) return
+
+        val existingDestSiblings = allCols.filter {
+            !it.isSystem && it.parentKey == targetParentKey && it.key !in keys
+        }
+        var nextOrder = (existingDestSiblings.maxOfOrNull { it.sortOrder } ?: -1) + 1
+
+        viewModelScope.launch {
+            val updated = movingCols.map { col ->
+                col.copy(
+                    parentKey = targetParentKey,
+                    sortOrder = nextOrder++
+                )
+            }
+            repository.updateCollections(updated)
+            val targetName = if (targetParentKey == null) {
+                "Folders (Top-Level)"
+            } else {
+                allCols.firstOrNull { it.key == targetParentKey }?.name ?: "Folder"
+            }
+            _statusBannerMessage.value = if (updated.size == 1) {
+                "Moved \"${updated.first().name}\" to $targetName"
+            } else {
+                "Moved ${updated.size} folders to $targetName"
+            }
+        }
+    }
+
+    fun reorderCollection(key: String, moveUp: Boolean) {
+        val allCols = uiState.value.collections
+        val target = allCols.firstOrNull { it.key == key && !it.isSystem } ?: return
+        val siblings = allCols
+            .filter { !it.isSystem && it.parentKey == target.parentKey && it.parentKey != "GROUP_LIBRARY" }
+            .sortedWith(compareBy<ZoteroCollection> { it.sortOrder }.thenBy { it.name.lowercase() })
+            .toMutableList()
+
+        val idx = siblings.indexOfFirst { it.key == key }
+        if (idx == -1) return
+        val swapIdx = if (moveUp) idx - 1 else idx + 1
+        if (swapIdx !in siblings.indices) return
+
+        val temp = siblings[idx]
+        siblings[idx] = siblings[swapIdx]
+        siblings[swapIdx] = temp
+
+        val normalized = siblings.mapIndexed { i, col -> col.copy(sortOrder = i) }
+        viewModelScope.launch {
+            repository.updateCollections(normalized)
+        }
+    }
+
+    fun dropReorderCollection(
+        draggedKey: String,
+        targetKey: String?,
+        placement: FolderDropPlacement
+    ) {
+        val allCols = uiState.value.collections
+        val draggedCol = allCols.firstOrNull {
+            it.key == draggedKey && !it.isSystem && it.parentKey != "GROUP_LIBRARY"
+        } ?: return
+
+        val descendantKeys = collectDescendantKeys(draggedKey, allCols)
+        val folderComparator = compareBy<ZoteroCollection> { it.sortOrder }.thenBy { it.name.lowercase() }
+
+        val targetCol = if (placement == FolderDropPlacement.ROOT_TOP) {
+            null
+        } else {
+            val found = allCols.firstOrNull {
+                it.key == targetKey && !it.isSystem && it.parentKey != "GROUP_LIBRARY"
+            } ?: return
+            if (found.key in descendantKeys) {
+                _statusBannerMessage.value = "Cannot move a folder into itself or its subfolder"
+                return
+            }
+            found
+        }
+
+        val oldParentKey = draggedCol.parentKey
+        val newParentKey = when (placement) {
+            FolderDropPlacement.ROOT_TOP -> null
+            FolderDropPlacement.INSIDE -> targetCol?.key
+            FolderDropPlacement.ABOVE, FolderDropPlacement.BELOW -> targetCol?.parentKey
+        }
+
+        val updates = mutableListOf<ZoteroCollection>()
+
+        // If moving across different parent levels, normalize old sibling group sortOrder
+        if (oldParentKey != newParentKey) {
+            val remainingOldSiblings = allCols
+                .filter {
+                    !it.isSystem &&
+                        it.parentKey != "GROUP_LIBRARY" &&
+                        it.parentKey == oldParentKey &&
+                        it.key != draggedKey
+                }
+                .sortedWith(folderComparator)
+                .mapIndexed { index, col -> col.copy(sortOrder = index) }
+            updates.addAll(remainingOldSiblings)
+        }
+
+        // Build new sibling list in target parent and insert dragged folder at exact drop position
+        val destSiblings = allCols
+            .filter {
+                !it.isSystem &&
+                    it.parentKey != "GROUP_LIBRARY" &&
+                    it.parentKey == newParentKey &&
+                    it.key != draggedKey
+            }
+            .sortedWith(folderComparator)
+            .toMutableList()
+
+        val movedDraggedCol = draggedCol.copy(parentKey = newParentKey)
+        when (placement) {
+            FolderDropPlacement.ROOT_TOP -> {
+                destSiblings.add(0, movedDraggedCol)
+            }
+            FolderDropPlacement.INSIDE -> {
+                destSiblings.add(movedDraggedCol)
+            }
+            FolderDropPlacement.ABOVE -> {
+                val targetIndex = destSiblings.indexOfFirst { it.key == targetKey }
+                if (targetIndex >= 0) {
+                    destSiblings.add(targetIndex, movedDraggedCol)
+                } else {
+                    destSiblings.add(movedDraggedCol)
+                }
+            }
+            FolderDropPlacement.BELOW -> {
+                val targetIndex = destSiblings.indexOfFirst { it.key == targetKey }
+                if (targetIndex >= 0) {
+                    destSiblings.add(targetIndex + 1, movedDraggedCol)
+                } else {
+                    destSiblings.add(movedDraggedCol)
+                }
+            }
+        }
+
+        val normalizedDestSiblings = destSiblings.mapIndexed { index, col ->
+            col.copy(sortOrder = index)
+        }
+        updates.addAll(normalizedDestSiblings)
+
+        viewModelScope.launch {
+            repository.updateCollections(updates)
+            if (oldParentKey != newParentKey) {
+                val destName = if (newParentKey == null) {
+                    "Top-Level Folders"
+                } else {
+                    allCols.firstOrNull { it.key == newParentKey }?.name ?: "Folder"
+                }
+                _statusBannerMessage.value = "Moved \"${draggedCol.name}\" to $destName"
+            }
+        }
+    }
+
+    fun deleteCollectionsWithCascadeTrash(selectedKeys: Set<String>) {
+        if (selectedKeys.isEmpty()) return
+        val allCols = uiState.value.collections
+        val closureKeys = selectedKeys
+            .flatMap { collectDescendantKeys(it, allCols) }
+            .filter { key -> allCols.firstOrNull { it.key == key }?.isSystem == false }
+            .toSet()
+
+        if (closureKeys.isEmpty()) return
+
+        viewModelScope.launch {
+            val trashedCount = repository.deleteCollectionsAndTrashPapers(
+                keysToDelete = closureKeys,
+                currentItems = uiState.value.allItems
+            )
+            if (_activeCollectionKey.value in closureKeys) {
+                _activeCollectionKey.value = LibraryFilter.ALL.key
+            }
+            _statusBannerMessage.value = if (trashedCount > 0) {
+                "Deleted ${closureKeys.size} folder(s) and moved $trashedCount paper(s) to Trash"
+            } else {
+                "Deleted ${closureKeys.size} folder(s)"
+            }
         }
     }
 
     fun deleteCollection(collection: ZoteroCollection) {
-        viewModelScope.launch {
-            repository.deleteCollection(collection.key)
-            if (_activeCollectionKey.value == collection.key) {
-                _activeCollectionKey.value = LibraryFilter.ALL.key
-            }
-            _statusBannerMessage.value = "Deleted collection \"${collection.name}\""
-        }
+        deleteCollectionsWithCascadeTrash(setOf(collection.key))
     }
 }

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -68,8 +69,7 @@ import org.zotero.android.data.model.ItemType
 import org.zotero.android.data.model.ZoteroItem
 import org.zotero.android.ui.SearchFilters
 import org.zotero.android.ui.ZoteroUiState
-import org.zotero.android.ui.theme.OnTealAccentPill
-import org.zotero.android.ui.theme.TealAccentPill
+import org.zotero.android.ui.theme.ZoteroThemeTokens
 
 @Composable
 fun SearchOverlayScreen(
@@ -84,6 +84,7 @@ fun SearchOverlayScreen(
     onOpenMetadataSheet: (Int) -> Unit,
     onToggleFavorite: (ZoteroItem) -> Unit
 ) {
+    val extColors = ZoteroThemeTokens.colors
     BackHandler(onBack = onClose)
 
     val focusRequester = remember { FocusRequester() }
@@ -379,8 +380,8 @@ fun SearchOverlayScreen(
                     } else null,
                     shape = RoundedCornerShape(10.dp),
                     colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = TealAccentPill,
-                        selectedLabelColor = OnTealAccentPill
+                        selectedContainerColor = extColors.accentPill,
+                        selectedLabelColor = extColors.onAccentPill
                     ),
                     modifier = Modifier.testTag("search_chip_pdf")
                 )
@@ -469,18 +470,27 @@ fun SearchOverlayScreen(
                     }
                 }
             } else {
+                val matchedItemsCount = uiState.searchMatchedItems.size
+                val matchedNotesCount = uiState.searchMatchedNotes.size
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxSize()
+                        .background(extColors.listCanvasBg)
                         .testTag("search_results_list"),
-                    contentPadding = PaddingValues(bottom = 32.dp)
+                    contentPadding = PaddingValues(
+                        start = 12.dp,
+                        end = 12.dp,
+                        top = 6.dp,
+                        bottom = 32.dp
+                    ),
+                    verticalArrangement = Arrangement.spacedBy(if (uiState.isLibraryCompactView) 4.dp else 6.dp)
                 ) {
                     item {
                         Text(
-                            text = "Matching Papers (${uiState.searchMatchedItems.size})",
+                            text = "Matching Papers ($matchedItemsCount)",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                            modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)
                         )
                     }
 
@@ -490,14 +500,15 @@ fun SearchOverlayScreen(
                                 text = "No papers match the selected search and filter criteria.",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 10.dp)
                             )
                         }
                     } else {
-                        items(uiState.searchMatchedItems, key = { it.id }) { item ->
+                        itemsIndexed(uiState.searchMatchedItems, key = { _, it -> it.id }) { index, item ->
                             GmailStylePaperRow(
                                 item = item,
                                 isCompact = uiState.isLibraryCompactView,
+                                shape = groupedListItemShape(index, matchedItemsCount),
                                 onOpenPaperReader = {
                                     if (sf.query.isNotBlank()) onRecordRecentSearch(sf.query)
                                     onClose()
@@ -508,62 +519,64 @@ fun SearchOverlayScreen(
                                 },
                                 onToggleFavorite = { onToggleFavorite(item) }
                             )
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.65f),
-                                thickness = 0.8.dp
-                            )
                         }
                     }
 
                     if (uiState.searchMatchedNotes.isNotEmpty()) {
                         item {
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(8.dp))
                             Text(
-                                text = "Matching Notes (${uiState.searchMatchedNotes.size})",
+                                text = "Matching Notes ($matchedNotesCount)",
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                                modifier = Modifier.padding(horizontal = 6.dp, vertical = 6.dp)
                             )
                         }
 
-                        items(uiState.searchMatchedNotes, key = { it.id }) { note ->
-                            Row(
+                        itemsIndexed(uiState.searchMatchedNotes, key = { _, it -> it.id }) { index, note ->
+                            val noteShape = groupedListItemShape(index, matchedNotesCount)
+                            Surface(
+                                shape = noteShape,
+                                color = extColors.listCardSurface,
+                                tonalElevation = 1.dp,
                                 modifier = Modifier
                                     .fillMaxWidth()
+                                    .clip(noteShape)
                                     .clickable {
                                         note.parentItemId?.let {
                                             onClose()
                                             onOpenPaperReader(it)
                                         }
                                     }
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
                             ) {
-                                Icon(
-                                    imageVector = Icons.AutoMirrored.Filled.StickyNote2,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.primary
-                                )
-                                Column(modifier = Modifier.weight(1f)) {
-                                    Text(
-                                        text = note.title,
-                                        style = MaterialTheme.typography.titleSmall,
-                                        color = MaterialTheme.colorScheme.onSurface
+                                Row(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.AutoMirrored.Filled.StickyNote2,
+                                        contentDescription = null,
+                                        tint = MaterialTheme.colorScheme.primary
                                     )
-                                    Text(
-                                        text = note.content,
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis
-                                    )
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = note.title,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            color = MaterialTheme.colorScheme.onSurface
+                                        )
+                                        Text(
+                                            text = note.content,
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                            maxLines = 2,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    }
                                 }
                             }
-                            HorizontalDivider(
-                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f),
-                                thickness = 0.8.dp
-                            )
                         }
                     }
                 }
@@ -579,12 +592,13 @@ private fun GmailDropdownFilterChip(
     onClick: () -> Unit,
     testTag: String
 ) {
+    val extColors = ZoteroThemeTokens.colors
     Surface(
-        color = if (selected) TealAccentPill else MaterialTheme.colorScheme.surface,
+        color = if (selected) extColors.accentPill else MaterialTheme.colorScheme.surface,
         shape = RoundedCornerShape(10.dp),
         border = BorderStroke(
             width = 1.dp,
-            color = if (selected) OnTealAccentPill.copy(alpha = 0.3f) else MaterialTheme.colorScheme.outline
+            color = if (selected) extColors.onAccentPill.copy(alpha = 0.3f) else MaterialTheme.colorScheme.outline
         ),
         modifier = Modifier
             .clip(RoundedCornerShape(10.dp))
@@ -600,12 +614,12 @@ private fun GmailDropdownFilterChip(
                 text = label,
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                color = if (selected) OnTealAccentPill else MaterialTheme.colorScheme.onSurfaceVariant
+                color = if (selected) extColors.onAccentPill else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Icon(
                 imageVector = Icons.Default.ArrowDropDown,
                 contentDescription = null,
-                tint = if (selected) OnTealAccentPill else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (selected) extColors.onAccentPill else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(18.dp)
             )
         }

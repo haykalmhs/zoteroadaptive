@@ -142,7 +142,9 @@ data class ZoteroCollection(
     val name: String,
     val parentKey: String? = null,
     val isSystem: Boolean = false,
-    val description: String = ""
+    val description: String = "",
+    val colorHex: String? = null,
+    val sortOrder: Int = 0
 )
 
 enum class SortField(val label: String) {
