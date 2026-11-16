@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Zotero</string>
+    <string name="nav_library">Library</string>
+    <string name="nav_collections">Collections</string>
+    <string name="nav_reader">Reader &amp; Notes</string>
+    <string name="nav_citations">Cite &amp; Export</string>
+    <string name="search_placeholder">Search title, creator, year, DOI, or tag…</string>
+    <string name="add_item_title">Add Research Item</string>
+    <string name="quick_add_identifier">Add by Identifier (DOI, ISBN, arXiv)</string>
+    <string name="empty_library_title">No items match your filter</string>
+    <string name="empty_library_subtitle">Try clearing your search query or add a new research source via DOI, ISBN, or manual entry.</string>
+</resources>
